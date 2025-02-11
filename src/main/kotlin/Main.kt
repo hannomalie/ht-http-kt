@@ -87,7 +87,6 @@ class HTTPRequestHandler(private val routeDefinitions: List<RouteDefinition>) : 
                 } else {
                     null
                 }
-
             } else {
                 "HTTP/1.1 404"
             }
