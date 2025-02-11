@@ -108,7 +108,7 @@ class HTTPRequestHandler(private val routeDefinitions: List<RouteDefinition>) : 
     }
 }
 
-class HttpServer(val port: Int, val routeDefinitions: List<RouteDefinition>) {
+class HttpServer(val port: Int, vararg val routeDefinitions: RouteDefinition) {
     fun run() {
         val bossGroup = NioEventLoopGroup()
         val workerGroup = NioEventLoopGroup()
@@ -119,7 +119,7 @@ class HttpServer(val port: Int, val routeDefinitions: List<RouteDefinition>) {
                     NioServerSocketChannel::class.java)
                         .childHandler(object: ChannelInitializer <SocketChannel>() {
                             override fun initChannel(ch: SocketChannel) {
-                                ch.pipeline().addLast(HTTPRequestHandler(routeDefinitions))
+                                ch.pipeline().addLast(HTTPRequestHandler(routeDefinitions.toList()))
                             }
                         })
                         .option(ChannelOption.SO_BACKLOG, 128)
@@ -143,37 +143,26 @@ fun main(args: Array<String>) {
 
     HttpServer(
         port,
-        listOf(
-            RouteDefinition(
-                "GET",
-                "/"
-            ) { request ->
-                Response(
-                    200,
-                    listOf(Header("Content-Type", "text/html")),
-                    "<html><body>" + request.headers + "</body></html>"
-                )
-            },
-            RouteDefinition(
-                "GET",
-                "/params"
-            ) { request ->
-                Response(
-                    200,
-                    listOf(Header("Content-Type", "text/html")),
-                    "<html><body>" + request.params + "</body></html>"
-                )
-            },
-            RouteDefinition(
-                "PUT",
-                "/body"
-            ) { request ->
-                Response(
-                    200,
-                    listOf(Header("Content-Type", "text/html")),
-                    request.body
-                )
-            },
-        )
+        RouteDefinition("GET", "/") { request ->
+            Response(
+                200,
+                listOf(Header("Content-Type", "text/html")),
+                "<html><body>" + request.headers + "</body></html>"
+            )
+        },
+        RouteDefinition("GET", "/params") { request ->
+            Response(
+                200,
+                listOf(Header("Content-Type", "text/html")),
+                "<html><body>" + request.params + "</body></html>"
+            )
+        },
+        RouteDefinition("PUT", "/body") { request ->
+            Response(
+                200,
+                listOf(Header("Content-Type", "text/html")),
+                request.body
+            )
+        },
     ).run()
 }
