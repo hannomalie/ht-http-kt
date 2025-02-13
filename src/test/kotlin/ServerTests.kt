@@ -1,21 +1,21 @@
-import jdk.internal.net.http.RequestPublishers
+import org.example.*
 import org.example.Header
 import org.example.HttpServer
 import org.example.Response
 import org.example.RouteDefinition
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
-import java.net.http.HttpRequest.BodyPublisher
 import java.net.http.HttpResponse
 import java.net.http.HttpResponse.BodyHandlers
 import java.util.concurrent.CompletableFuture
 import kotlin.test.assertEquals
 
 
+@TestInstance(value = TestInstance.Lifecycle.PER_CLASS)
 class ServerTests {
-
     val server = HttpServer(
         9909,
         RouteDefinition("GET", "/") { request ->
@@ -40,8 +40,8 @@ class ServerTests {
             )
         },
     ).apply {
-        CompletableFuture.runAsync {
-            run()
+        CompletableFuture.supplyAsync {
+            runOnSocket()
         }
     }
 

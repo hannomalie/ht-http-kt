@@ -2,22 +2,15 @@ package org.example
 
 import io.netty.bootstrap.ServerBootstrap
 import io.netty.buffer.ByteBuf
-import io.netty.channel.*
+import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelInboundHandlerAdapter
+import io.netty.channel.ChannelInitializer
+import io.netty.channel.ChannelOption
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioServerSocketChannel
 
-data class Header(val key: String, val value: String)
-data class Param(val key: String, val value: String)
-data class Request(val headers: List<Header>, val params: List<Param>, val body: String)
-data class Response(val status: Int, val headers: List<Header>, val body: String)
-
-class RouteDefinition(val method: String, val path: String, val handler: RequestHandler)
-fun interface RequestHandler {
-    operator fun invoke(request: Request): Response
-}
-
-class HTTPRequestHandler(private val routeDefinitions: List<RouteDefinition>) : ChannelInboundHandlerAdapter() {
+class NettyHTTPRequestHandler(private val routeDefinitions: List<RouteDefinition>) : ChannelInboundHandlerAdapter() {
     private var buf: ByteBuf? = null
 
     override fun handlerRemoved(ctx: ChannelHandlerContext?) {
@@ -107,61 +100,31 @@ class HTTPRequestHandler(private val routeDefinitions: List<RouteDefinition>) : 
     }
 }
 
-class HttpServer(val port: Int, vararg val routeDefinitions: RouteDefinition) {
-    fun run() {
-        val bossGroup = NioEventLoopGroup()
-        val workerGroup = NioEventLoopGroup()
-        try {
-            val b = ServerBootstrap()
-            b.group(bossGroup, workerGroup)
-                .channel(
-                    NioServerSocketChannel::class.java)
-                        .childHandler(object: ChannelInitializer <SocketChannel>() {
-                            override fun initChannel(ch: SocketChannel) {
-                                ch.pipeline().addLast(HTTPRequestHandler(routeDefinitions.toList()))
-                            }
-                        })
-                        .option(ChannelOption.SO_BACKLOG, 128)
-                        .childOption(ChannelOption.SO_KEEPALIVE, true)
+fun HttpServer.runWithNetty() {
+    val bossGroup = NioEventLoopGroup()
+    val workerGroup = NioEventLoopGroup()
+    try {
+        val b = ServerBootstrap()
+        b.group(bossGroup, workerGroup)
+            .channel(
+                NioServerSocketChannel::class.java)
+                    .childHandler(object: ChannelInitializer<SocketChannel>() {
+                        override fun initChannel(ch: SocketChannel) {
+                            ch.pipeline().addLast(NettyHTTPRequestHandler(routeDefinitions.toList()))
+                        }
+                    })
+                    .option(ChannelOption.SO_BACKLOG, 128)
+                    .childOption(ChannelOption.SO_KEEPALIVE, true)
 
-            // Bind and start to accept incoming connections.
-            val f = b.bind(port).sync()
+        // Bind and start to accept incoming connections.
+        val f = b.bind(port).sync()
 
-            // Wait until the server socket is closed.
-            // In this example, this does not happen, but you can do that to gracefully
-            // shut down your server.
-            f.channel().closeFuture().sync()
-        } finally {
-            workerGroup.shutdownGracefully()
-            bossGroup.shutdownGracefully()
-        }
+        // Wait until the server socket is closed.
+        // In this example, this does not happen, but you can do that to gracefully
+        // shut down your server.
+        f.channel().closeFuture().sync()
+    } finally {
+        workerGroup.shutdownGracefully()
+        bossGroup.shutdownGracefully()
     }
-}
-fun main(args: Array<String>) {
-    val port: Int = if (args.isNotEmpty()) args[0].toInt() else 8080
-
-    HttpServer(
-        port,
-        RouteDefinition("GET", "/") { request ->
-            Response(
-                200,
-                listOf(Header("Content-Type", "text/html")),
-                "<html><body>" + request.headers + "</body></html>"
-            )
-        },
-        RouteDefinition("GET", "/params") { request ->
-            Response(
-                200,
-                listOf(Header("Content-Type", "text/html")),
-                "<html><body>" + request.params + "</body></html>"
-            )
-        },
-        RouteDefinition("PUT", "/body") { request ->
-            Response(
-                200,
-                listOf(Header("Content-Type", "text/html")),
-                request.body
-            )
-        },
-    ).run()
 }
