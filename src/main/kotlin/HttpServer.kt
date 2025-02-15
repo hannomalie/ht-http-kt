@@ -4,7 +4,6 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.ServerSocket
-import java.nio.ByteBuffer
 
 data class Header(val key: String, val value: String)
 data class Param(val key: String, val value: String)
@@ -66,15 +65,11 @@ fun HttpServer.runOnSocket() {
             val body = if(contentLength == null) {
                 ""
             } else {
-                val bodyBuffer = ByteBuffer.allocate(contentLength)
-                val bodyUntilNow = lines.subList(emptyLineIndex, lines.size).joinToString("")
-                bodyBuffer.put(bodyUntilNow.toByteArray(Charsets.UTF_8))
-
-                val restBody = inputStream.readNBytes(contentLength - bodyUntilNow.length)
-                bodyBuffer.put(restBody)
-
-                String(bodyBuffer.array(), Charsets.UTF_8)
-
+                val bodyUntilNow = lines.subList(emptyLineIndex, lines.size).joinToString("").toCharArray()
+                val remainingBodySize = contentLength - bodyUntilNow.size
+                val restBody = CharArray(remainingBodySize)
+                bufferedReader.read(restBody)
+                String(bodyUntilNow) + String(restBody)
             }
             val response = handler.invoke(
                 Request(
